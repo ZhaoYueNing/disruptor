@@ -1,3 +1,0 @@
-jcstress {
-    mode = project.getProperties().getOrDefault("mode", "default")
-}
