@@ -46,7 +46,8 @@ apply from: 'gradle/jcstress.gradle'
 wrapper.gradleVersion = '6.5'
 
 repositories {
-    mavenCentral()
+    maven{ url 'http://maven.aliyun.com/nexus/content/groups/public/' }
+    maven{ url 'http://maven.aliyun.com/nexus/content/repositories/jcenter'}
 }
 
 sourceCompatibility = targetCompatibility = JavaVersion.VERSION_11
