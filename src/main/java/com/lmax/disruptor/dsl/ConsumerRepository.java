@@ -24,43 +24,35 @@ import java.util.*;
  *
  * @param <T> the type of the {@link EventHandler}
  */
-class ConsumerRepository<T> implements Iterable<ConsumerInfo>
-{
+class ConsumerRepository<T> implements Iterable<ConsumerInfo> {
     private final Map<EventHandler<?>, EventProcessorInfo<T>> eventProcessorInfoByEventHandler =
-        new IdentityHashMap<>();
+            new IdentityHashMap<>();
     private final Map<Sequence, ConsumerInfo> eventProcessorInfoBySequence =
-        new IdentityHashMap<>();
+            new IdentityHashMap<>();
     private final Collection<ConsumerInfo> consumerInfos = new ArrayList<>();
 
     public void add(
-        final EventProcessor eventprocessor,
-        final EventHandler<? super T> handler,
-        final SequenceBarrier barrier)
-    {
+            final EventProcessor eventprocessor,
+            final EventHandler<? super T> handler,
+            final SequenceBarrier barrier) {
         final EventProcessorInfo<T> consumerInfo = new EventProcessorInfo<>(eventprocessor, handler, barrier);
         eventProcessorInfoByEventHandler.put(handler, consumerInfo);
         eventProcessorInfoBySequence.put(eventprocessor.getSequence(), consumerInfo);
         consumerInfos.add(consumerInfo);
     }
 
-    public void add(final EventProcessor processor)
-    {
+    public void add(final EventProcessor processor) {
         final EventProcessorInfo<T> consumerInfo = new EventProcessorInfo<>(processor, null, null);
         eventProcessorInfoBySequence.put(processor.getSequence(), consumerInfo);
         consumerInfos.add(consumerInfo);
     }
 
-    public boolean hasBacklog(long cursor, boolean includeStopped)
-    {
-        for (ConsumerInfo consumerInfo : consumerInfos)
-        {
-            if ((includeStopped || consumerInfo.isRunning()) && consumerInfo.isEndOfChain())
-            {
+    public boolean hasBacklog(long cursor, boolean includeStopped) {
+        for (ConsumerInfo consumerInfo : consumerInfos) {
+            if ((includeStopped || consumerInfo.isRunning()) && consumerInfo.isEndOfChain()) {
                 final Sequence[] sequences = consumerInfo.getSequences();
-                for (Sequence sequence : sequences)
-                {
-                    if (cursor > sequence.get())
-                    {
+                for (Sequence sequence : sequences) {
+                    if (cursor > sequence.get()) {
                         return true;
                     }
                 }
@@ -75,13 +67,10 @@ class ConsumerRepository<T> implements Iterable<ConsumerInfo>
      * of a backlog, instead use hasBacklog
      */
     @Deprecated
-    public Sequence[] getLastSequenceInChain(boolean includeStopped)
-    {
+    public Sequence[] getLastSequenceInChain(boolean includeStopped) {
         List<Sequence> lastSequence = new ArrayList<>();
-        for (ConsumerInfo consumerInfo : consumerInfos)
-        {
-            if ((includeStopped || consumerInfo.isRunning()) && consumerInfo.isEndOfChain())
-            {
+        for (ConsumerInfo consumerInfo : consumerInfos) {
+            if ((includeStopped || consumerInfo.isRunning()) && consumerInfo.isEndOfChain()) {
                 final Sequence[] sequences = consumerInfo.getSequences();
                 Collections.addAll(lastSequence, sequences);
             }
@@ -90,49 +79,40 @@ class ConsumerRepository<T> implements Iterable<ConsumerInfo>
         return lastSequence.toArray(new Sequence[lastSequence.size()]);
     }
 
-    public EventProcessor getEventProcessorFor(final EventHandler<T> handler)
-    {
+    public EventProcessor getEventProcessorFor(final EventHandler<T> handler) {
         final EventProcessorInfo<T> eventprocessorInfo = getEventProcessorInfo(handler);
-        if (eventprocessorInfo == null)
-        {
+        if (eventprocessorInfo == null) {
             throw new IllegalArgumentException("The event handler " + handler + " is not processing events.");
         }
 
         return eventprocessorInfo.getEventProcessor();
     }
 
-    public Sequence getSequenceFor(final EventHandler<T> handler)
-    {
+    public Sequence getSequenceFor(final EventHandler<T> handler) {
         return getEventProcessorFor(handler).getSequence();
     }
 
-    public void unMarkEventProcessorsAsEndOfChain(final Sequence... barrierEventProcessors)
-    {
-        for (Sequence barrierEventProcessor : barrierEventProcessors)
-        {
+    public void unMarkEventProcessorsAsEndOfChain(final Sequence... barrierEventProcessors) {
+        for (Sequence barrierEventProcessor : barrierEventProcessors) {
             getEventProcessorInfo(barrierEventProcessor).markAsUsedInBarrier();
         }
     }
 
     @Override
-    public Iterator<ConsumerInfo> iterator()
-    {
+    public Iterator<ConsumerInfo> iterator() {
         return consumerInfos.iterator();
     }
 
-    public SequenceBarrier getBarrierFor(final EventHandler<T> handler)
-    {
+    public SequenceBarrier getBarrierFor(final EventHandler<T> handler) {
         final ConsumerInfo consumerInfo = getEventProcessorInfo(handler);
         return consumerInfo != null ? consumerInfo.getBarrier() : null;
     }
 
-    private EventProcessorInfo<T> getEventProcessorInfo(final EventHandler<T> handler)
-    {
+    private EventProcessorInfo<T> getEventProcessorInfo(final EventHandler<T> handler) {
         return eventProcessorInfoByEventHandler.get(handler);
     }
 
-    private ConsumerInfo getEventProcessorInfo(final Sequence barrierEventProcessor)
-    {
+    private ConsumerInfo getEventProcessorInfo(final Sequence barrierEventProcessor) {
         return eventProcessorInfoBySequence.get(barrierEventProcessor);
     }
 }
