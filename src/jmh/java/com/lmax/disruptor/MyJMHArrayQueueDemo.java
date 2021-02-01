@@ -5,15 +5,11 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import com.lmax.disruptor.util.Constants;
-import com.lmax.disruptor.util.DaemonThreadFactory;
-import com.lmax.disruptor.util.SimpleEvent;
-
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
+import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
-import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
@@ -25,25 +21,32 @@ import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
-@BenchmarkMode(Mode.AverageTime)
-@OutputTimeUnit(TimeUnit.NANOSECONDS)
-@State(Scope.Thread)
+import com.lmax.disruptor.util.Constants;
+import com.lmax.disruptor.util.DaemonThreadFactory;
+import com.lmax.disruptor.util.SimpleEvent;
+
+/**
+ * @author zhaoyuening
+ */
 @Fork(1)
-public class BlockingQueueBenchmark {
-    private BlockingQueue<SimpleEvent> arrayBlockingQueue;
+@Warmup(iterations = 1, time = 1)
+@Measurement(iterations = 2, time = 1)
+@State(Scope.Thread)
+public class MyJMHArrayQueueDemo {
+    private BlockingQueue<SimpleEvent> queue;
     private volatile boolean consumerRunning;
     private SimpleEvent simpleEvent;
 
     @Setup
-    public void setup(final Blackhole bh) throws InterruptedException {
-        arrayBlockingQueue = new ArrayBlockingQueue<>(Constants.RINGBUFFER_SIZE);
+    public void setup(final Blackhole bh ) throws InterruptedException {
+        queue = new ArrayBlockingQueue<>(Constants.RINGBUFFER_SIZE);
 
         final CountDownLatch consumerStartedLatch = new CountDownLatch(1);
         final Thread eventHandler = DaemonThreadFactory.INSTANCE.newThread(() ->
         {
             consumerStartedLatch.countDown();
             while (consumerRunning) {
-                SimpleEvent event = arrayBlockingQueue.poll();
+                SimpleEvent event = queue.poll();
                 if (event != null) {
                     bh.consume(event);
                 }
@@ -57,10 +60,11 @@ public class BlockingQueueBenchmark {
         simpleEvent.setValue(0);
     }
 
+
     @Benchmark
     @BenchmarkMode(Mode.Throughput)
     public void producing() throws InterruptedException {
-        if (!arrayBlockingQueue.offer(simpleEvent, 1, TimeUnit.SECONDS)) {
+        if (!queue.offer(simpleEvent, 1, TimeUnit.SECONDS)) {
             throw new IllegalStateException("Queue full, benchmark should not experience backpressure");
         }
     }
@@ -72,7 +76,7 @@ public class BlockingQueueBenchmark {
 
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
-                .include(BlockingQueueBenchmark.class.getSimpleName())
+                .include(MyJMHArrayQueueDemo.class.getSimpleName())
                 .build();
         new Runner(opt).run();
     }

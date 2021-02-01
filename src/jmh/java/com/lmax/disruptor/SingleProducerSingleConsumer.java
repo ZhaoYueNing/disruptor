@@ -28,14 +28,12 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @State(Scope.Thread)
 @Fork(1)
-public class SingleProducerSingleConsumer
-{
+public class SingleProducerSingleConsumer {
     private RingBuffer<SimpleEvent> ringBuffer;
     private Disruptor<SimpleEvent> disruptor;
 
     @Setup
-    public void setup(final Blackhole bh)
-    {
+    public void setup(final Blackhole bh) {
         disruptor = new Disruptor<>(SimpleEvent::new,
                 Constants.RINGBUFFER_SIZE,
                 DaemonThreadFactory.INSTANCE,
@@ -48,8 +46,7 @@ public class SingleProducerSingleConsumer
     }
 
     @Benchmark
-    public void producing()
-    {
+    public void producing() {
         long sequence = ringBuffer.next();
         SimpleEvent simpleEvent = ringBuffer.get(sequence);
         simpleEvent.setValue(0);
@@ -57,13 +54,11 @@ public class SingleProducerSingleConsumer
     }
 
     @TearDown
-    public void tearDown()
-    {
+    public void tearDown() {
         disruptor.shutdown();
     }
 
-    public static void main(String[] args) throws RunnerException
-    {
+    public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
                 .include(SingleProducerSingleConsumer.class.getSimpleName())
                 .forks(1)

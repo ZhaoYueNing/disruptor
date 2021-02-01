@@ -57,6 +57,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class Disruptor<T> {
     private final RingBuffer<T> ringBuffer;
     private final Executor executor;
+    // 存储消费者
     private final ConsumerRepository<T> consumerRepository = new ConsumerRepository<>();
     private final AtomicBoolean started = new AtomicBoolean(false);
     private ExceptionHandler<? super T> exceptionHandler = new ExceptionHandlerWrapper<>();
@@ -153,6 +154,7 @@ public class Disruptor<T> {
     @SuppressWarnings("varargs")
     @SafeVarargs
     public final EventHandlerGroup<T> handleEventsWith(final EventHandler<? super T>... handlers) {
+        // zyn new Sequence[0] 这个参数是做什么的？
         return createEventProcessors(new Sequence[0], handlers);
     }
 
@@ -351,6 +353,7 @@ public class Disruptor<T> {
     public RingBuffer<T> start() {
         checkOnlyStartedOnce();
         for (final ConsumerInfo consumerInfo : consumerRepository) {
+            // 启动每一个处理器
             consumerInfo.start(executor);
         }
 
@@ -474,17 +477,27 @@ public class Disruptor<T> {
         return consumerRepository.hasBacklog(cursor, false);
     }
 
+    /**
+     * @param barrierSequences 依赖的 sequence
+     * @param eventHandlers 注册的事件处理
+     */
     EventHandlerGroup<T> createEventProcessors(
             final Sequence[] barrierSequences,
             final EventHandler<? super T>[] eventHandlers) {
         checkNotStarted();
 
         final Sequence[] processorSequences = new Sequence[eventHandlers.length];
+        // SequenceBarrier 用于代替一组消费者进行监控消息生产，而非每个消费者直接监听ringBuffer
+        // barrierSequences 是需要依赖的前置消费者序列
+        // 这里的设计思路类似操作系统内epoll多路io复用，类似EventEpoll的作用
         final SequenceBarrier barrier = ringBuffer.newBarrier(barrierSequences);
 
         for (int i = 0, eventHandlersLength = eventHandlers.length; i < eventHandlersLength; i++) {
             final EventHandler<? super T> eventHandler = eventHandlers[i];
 
+            // BatchEventProcessor 是 EventProcessor 接口的实现
+            // EventHandler 相当于消费过程
+            // EventProcessor 是对EventHandler的线程执行适配封装
             final BatchEventProcessor<T> batchEventProcessor =
                     new BatchEventProcessor<>(ringBuffer, barrier, eventHandler);
 
@@ -492,21 +505,29 @@ public class Disruptor<T> {
                 batchEventProcessor.setExceptionHandler(exceptionHandler);
             }
 
+            // 注册消费者到 consumerRepository
             consumerRepository.add(batchEventProcessor, eventHandler, barrier);
             processorSequences[i] = batchEventProcessor.getSequence();
         }
 
         updateGatingSequencesForNextInChain(barrierSequences, processorSequences);
 
+        // 这是一个链式处理适配器类
         return new EventHandlerGroup<>(this, consumerRepository, processorSequences);
     }
 
     private void updateGatingSequencesForNextInChain(final Sequence[] barrierSequences, final Sequence[] processorSequences) {
         if (processorSequences.length > 0) {
+            // 这里实际是给Sequencer传递消费者Sequences
+            // 用于调用next时判断所有消费者的最小消费序列
             ringBuffer.addGatingSequences(processorSequences);
             for (final Sequence barrierSequence : barrierSequences) {
+                // 因为 processorSequences 必然小于等于 barrierSequences
+                // 且已经将 processorSequences 追加到Sequencer 的 gatingSequence
+                // 故移除不必要的前置 barrierSequences
                 ringBuffer.removeGatingSequence(barrierSequence);
             }
+            // 这里是对所有前置依赖的 Sequence 标记为非处理链的末端
             consumerRepository.unMarkEventProcessorsAsEndOfChain(barrierSequences);
         }
     }

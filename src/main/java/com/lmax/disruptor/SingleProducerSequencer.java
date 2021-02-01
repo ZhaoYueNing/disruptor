@@ -113,6 +113,8 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
         long wrapPoint = nextSequence - bufferSize;
         long cachedGatingSequence = this.cachedValue;
 
+        // zyn 这个步骤的作用是什么？
+        // nextValue + n > cachedGatingSequence + bufferSize || nextValue < cachedGatingSequence
         if (wrapPoint > cachedGatingSequence || cachedGatingSequence > nextValue) {
             cursor.setVolatile(nextValue);  // StoreLoad fence
 
@@ -180,7 +182,10 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
      */
     @Override
     public void publish(long sequence) {
+        // 因为是单线程写，这里用的是 store/store 屏障
+        // 不能保障立刻可见
         cursor.set(sequence);
+        // 通知其他等待的消费
         waitStrategy.signalAllWhenBlocking();
     }
 

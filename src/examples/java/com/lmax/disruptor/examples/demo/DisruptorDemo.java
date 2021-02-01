@@ -3,10 +3,13 @@ package com.lmax.disruptor.examples.demo;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
+import com.lmax.disruptor.BlockingWaitStrategy;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.EventTranslator;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
+import com.lmax.disruptor.dsl.EventHandlerGroup;
+import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
 
 /**
@@ -57,18 +60,17 @@ public class DisruptorDemo {
     public static void main(String[] args) throws InterruptedException
     {
         final int bufferSize = 32;
-        Disruptor<LongEvent> disruptor = new Disruptor<>(LongEvent::new, bufferSize, DaemonThreadFactory.INSTANCE);
-        disruptor.handleEventsWith(
-                new LongEventHandler("Handler 5", 5),
-                new LongEventHandler("Handler 3", 3)
-        );
+        Disruptor<LongEvent> disruptor = new Disruptor<>(LongEvent::new, bufferSize, DaemonThreadFactory.INSTANCE, ProducerType.SINGLE, new BlockingWaitStrategy());
+        disruptor
+                .handleEventsWith(new LongEventHandler("Handler 5", 5))
+                .then(new LongEventHandler("Handler 3", 3));
 
         RingBuffer<LongEvent> ringBuffer = disruptor.start();
 
         System.out.println("start");
-              for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 1000; i++) {
             long next = ringBuffer.next();
-                   LongEvent longEvent = ringBuffer.get(next);
+            LongEvent longEvent = ringBuffer.get(next);
             longEvent.setVal(i);
             ringBuffer.publish(next);
         }

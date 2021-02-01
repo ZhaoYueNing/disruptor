@@ -25,6 +25,8 @@ import java.util.*;
  * @param <T> the type of the {@link EventHandler}
  */
 class ConsumerRepository<T> implements Iterable<ConsumerInfo> {
+    // zyn 为何使用 IdentityHashMap 呢？
+    // 因为这里的KEY采用了非基本包装类型的对象，Identity 用 == 来判断，只有同一个对象才会识别为同一个key
     private final Map<EventHandler<?>, EventProcessorInfo<T>> eventProcessorInfoByEventHandler =
             new IdentityHashMap<>();
     private final Map<Sequence, ConsumerInfo> eventProcessorInfoBySequence =

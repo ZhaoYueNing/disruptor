@@ -40,6 +40,10 @@ class RhsPadding extends Value {
  * <p>Also attempts to be more efficient with regards to false
  * sharing by adding padding around the volatile field.
  */
+// Sequence 本质上是维护一个数字值，保障其高效可见的读写
+// zyn 因为继承了 RhsPadding Sequence的字段实际为
+// p1, p2, p3, p4, p5, p6, p7, value, p9, p10, p11, p12, p13, p14, p15
+// 避免了伪共享
 public class Sequence extends RhsPadding {
     static final long INITIAL_VALUE = -1L;
     private static final Unsafe UNSAFE;
@@ -48,6 +52,7 @@ public class Sequence extends RhsPadding {
     static {
         UNSAFE = Util.getUnsafe();
         try {
+            // 得到了value在对象中的起始坐标
             VALUE_OFFSET = UNSAFE.objectFieldOffset(Value.class.getDeclaredField("value"));
         } catch (final Exception e) {
             throw new RuntimeException(e);
@@ -87,6 +92,10 @@ public class Sequence extends RhsPadding {
      * @param value The new value for the sequence.
      */
     public void set(final long value) {
+        // zyn 这里不能直接用set的方式吗？
+        // putOrderedLong 可以防止重排序
+        // 且是 Store/Store barrier 比 volatile 的 Store/Load barrier 性能消耗更低
+        // 此处仅仅防止写的顺序重排序，不会保障立刻可见
         UNSAFE.putOrderedLong(this, VALUE_OFFSET, value);
     }
 

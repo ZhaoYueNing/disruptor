@@ -38,6 +38,9 @@ public final class BatchEventProcessor<T>
     private final DataProvider<T> dataProvider;
     private final SequenceBarrier sequenceBarrier;
     private final EventHandler<? super T> eventHandler;
+    /**
+     * 用于维护该EventProcessor所处理到的序列
+     */
     private final Sequence sequence = new Sequence(Sequencer.INITIAL_CURSOR_VALUE);
     private final TimeoutHandler timeoutHandler;
     private final BatchStartAware batchStartAware;
@@ -121,19 +124,25 @@ public final class BatchEventProcessor<T>
             // this point.  However, Java does not have compareAndExchange which is the only way
             // to get it exactly correct.
             if (running.get() == RUNNING) {
-                throw new IllegalStateException("Thread is already running");
+                throw new IllegalStateException("Thread is already ruavailableSequencenning");
             } else {
                 earlyExit();
             }
         }
     }
 
+    /**
+     * 核心
+     * 不断轮训消费event
+     */
     private void processEvents() {
         T event = null;
+        // 下一个需要消费的序号
         long nextSequence = sequence.get() + 1L;
 
         while (true) {
             try {
+                // 这里 sequenceBarrier 将EventProcessor与Sequencer相隔离，不直接操作Sequencer
                 final long availableSequence = sequenceBarrier.waitFor(nextSequence);
                 if (batchStartAware != null && availableSequence >= nextSequence) {
                     batchStartAware.onBatchStart(availableSequence - nextSequence + 1);
